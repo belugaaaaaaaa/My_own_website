@@ -37,6 +37,17 @@
   2. 把导出的 JSON 保存到项目里（例如 `data/backup.json`）
   3. 提交到 GitHub
 
+## 管理员权限
+
+- 默认访客是只读模式，不能修改数据
+- 只有管理员登录后，才能使用“数据管理”区的新增/导入/导出功能
+- 默认管理员账号配置在 `script.js`：
+  - `ADMIN_USERNAME = "admin"`
+  - 默认密码是：`change-me-now`
+- 建议你上线前马上改密码哈希：
+  1. 在本地执行：`node -e "const c=require('crypto');console.log(c.createHash('sha256').update('你的新密码').digest('hex'))"`
+  2. 把输出结果替换 `script.js` 里的 `ADMIN_PASSWORD_HASH`
+
 ## 后续可扩展
 
 - 增加“按年份筛选航线”

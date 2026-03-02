@@ -107,11 +107,32 @@
       <div id="gallery" class="gallery-grid"></div>
     </section>
 
+    <section id="auth-section" class="section reveal">
+      <div class="section-head">
+        <h2>管理员登录</h2>
+        <p>仅站长可修改网站数据。</p>
+      </div>
+      <form id="admin-login-form" class="auth-form">
+        <label>用户名
+          <input id="admin-username" name="username" autocomplete="username" required />
+        </label>
+        <label>密码
+          <input id="admin-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <div class="auth-actions">
+          <button type="submit">登录管理员</button>
+          <button id="admin-logout-btn" type="button" class="secondary-btn">退出登录</button>
+        </div>
+        <p id="admin-status" class="auth-status">当前状态：未登录（只读模式）</p>
+      </form>
+    </section>
+
     <section id="manage-section" class="section reveal">
       <div class="section-head">
         <h2>数据管理</h2>
         <p>新增航线、新增机场照片、导入导出你的记录。</p>
       </div>
+      <p id="manage-lock-hint" class="lock-hint">请先在上方“管理员登录”后再编辑数据。</p>
 
       <div class="manage-grid">
         <form id="route-form" class="panel">

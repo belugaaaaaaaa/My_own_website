@@ -1,4 +1,7 @@
 ﻿const STORAGE_KEY = "aviation-logbook-v1";
+const AUTH_SESSION_KEY = "aviation-admin-auth-v1";
+const ADMIN_USERNAME = "admin";
+const ADMIN_PASSWORD_HASH = "ccc0b903bce51fb554262d742d0a282e1f8a87d064f1cf44f8ff5148ca4beb42";
 
 const DEFAULT_DATA = {
   airports: [
@@ -71,24 +74,26 @@ let appData = loadData();
 let map;
 let routeLayer;
 let airportLayer;
+let isAdmin = sessionStorage.getItem(AUTH_SESSION_KEY) === "1";
 
 const yearEl = document.getElementById("year");
 if (yearEl) {
   yearEl.textContent = String(new Date().getFullYear());
 }
 
+syncAdminUI();
 initRevealAnimation();
 initMap();
 renderAll();
 bindForms();
 bindDataTools();
+bindAdminAuth();
 
 function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return structuredClone(DEFAULT_DATA);
-    }
+    if (!raw) return structuredClone(DEFAULT_DATA);
+
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.airports) || !Array.isArray(parsed.flights) || !Array.isArray(parsed.photos)) {
       return structuredClone(DEFAULT_DATA);
@@ -101,6 +106,69 @@ function loadData() {
 
 function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+}
+
+function syncAdminUI() {
+  document.body.dataset.admin = isAdmin ? "true" : "false";
+  const status = document.getElementById("admin-status");
+  if (status) {
+    status.textContent = isAdmin ? "当前状态：已登录管理员（可编辑）" : "当前状态：未登录（只读模式）";
+  }
+}
+
+function setAdminState(next) {
+  isAdmin = next;
+  if (isAdmin) {
+    sessionStorage.setItem(AUTH_SESSION_KEY, "1");
+  } else {
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+  }
+  syncAdminUI();
+}
+
+function bindAdminAuth() {
+  const form = document.getElementById("admin-login-form");
+  const logoutBtn = document.getElementById("admin-logout-btn");
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const usernameInput = document.getElementById("admin-username");
+    const passwordInput = document.getElementById("admin-password");
+
+    const username = String(usernameInput?.value || "").trim();
+    const password = String(passwordInput?.value || "");
+    const passwordHash = await sha256Hex(password);
+
+    if (username === ADMIN_USERNAME && passwordHash === ADMIN_PASSWORD_HASH) {
+      setAdminState(true);
+      form.reset();
+      alert("管理员登录成功。");
+      return;
+    }
+
+    setAdminState(false);
+    alert("账号或密码错误。");
+  });
+
+  logoutBtn?.addEventListener("click", () => {
+    setAdminState(false);
+    alert("已退出管理员登录。");
+  });
+}
+
+async function sha256Hex(input) {
+  if (!window.crypto?.subtle) return "";
+
+  const bytes = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function requireAdmin(actionText) {
+  if (isAdmin) return true;
+  alert(`请先在“管理员登录”中登录后再${actionText}。`);
+  return false;
 }
 
 function initRevealAnimation() {
@@ -126,7 +194,7 @@ function initMap() {
   }).setView([25, 15], 2);
 
   L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
     maxZoom: 8
   }).addTo(map);
 
@@ -224,8 +292,9 @@ function bindForms() {
 
   routeForm?.addEventListener("submit", (event) => {
     event.preventDefault();
-    const form = new FormData(routeForm);
+    if (!requireAdmin("添加航线")) return;
 
+    const form = new FormData(routeForm);
     const fromCode = normalizeCode(form.get("fromCode"));
     const toCode = normalizeCode(form.get("toCode"));
     const fromLat = Number(form.get("fromLat"));
@@ -238,19 +307,8 @@ function bindForms() {
       return;
     }
 
-    upsertAirport({
-      code: fromCode,
-      name: String(form.get("fromName") || fromCode).trim(),
-      lat: fromLat,
-      lng: fromLng
-    });
-
-    upsertAirport({
-      code: toCode,
-      name: String(form.get("toName") || toCode).trim(),
-      lat: toLat,
-      lng: toLng
-    });
+    upsertAirport({ code: fromCode, name: String(form.get("fromName") || fromCode).trim(), lat: fromLat, lng: fromLng });
+    upsertAirport({ code: toCode, name: String(form.get("toName") || toCode).trim(), lat: toLat, lng: toLng });
 
     appData.flights.push({
       id: uid("f"),
@@ -268,8 +326,9 @@ function bindForms() {
 
   photoForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const form = new FormData(photoForm);
+    if (!requireAdmin("添加照片")) return;
 
+    const form = new FormData(photoForm);
     const airportCode = normalizeCode(form.get("airportCode"));
     const title = String(form.get("title") || "").trim();
     const imageUrl = String(form.get("imageUrl") || "").trim();
@@ -316,6 +375,8 @@ function bindDataTools() {
   const resetBtn = document.getElementById("reset-btn");
 
   exportBtn?.addEventListener("click", () => {
+    if (!requireAdmin("导出数据")) return;
+
     const dataStr = JSON.stringify(appData, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -327,6 +388,11 @@ function bindDataTools() {
   });
 
   importInput?.addEventListener("change", async (event) => {
+    if (!requireAdmin("导入数据")) {
+      event.target.value = "";
+      return;
+    }
+
     const input = event.target;
     const file = input.files?.[0];
     if (!file) return;
@@ -347,6 +413,8 @@ function bindDataTools() {
   });
 
   resetBtn?.addEventListener("click", () => {
+    if (!requireAdmin("恢复示例数据")) return;
+
     if (!confirm("确定要恢复示例数据吗？当前浏览器中的自定义数据会被覆盖。")) {
       return;
     }

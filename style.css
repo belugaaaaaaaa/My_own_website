@@ -197,6 +197,44 @@ h1 {
   font-weight: 600;
 }
 
+.auth-form {
+  display: grid;
+  gap: 6px;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.secondary-btn {
+  background: #434343;
+}
+
+.auth-status {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.lock-hint {
+  margin: 0 0 10px;
+  color: #8b1e1e;
+  font-weight: 700;
+}
+
+body[data-admin="true"] .lock-hint {
+  display: none;
+}
+
+body[data-admin="false"] #manage-section .manage-grid,
+body[data-admin="false"] #manage-section .data-tools {
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+
 #map {
   height: 520px;
   border-radius: 14px;
