@@ -92,6 +92,7 @@ body::after {
   font-weight: 700;
   font-size: 0.9rem;
   min-width: 96px;
+  width: 96px;
   height: 38px;
   display: inline-flex;
   align-items: center;
@@ -99,6 +100,7 @@ body::after {
   border-radius: 999px;
   border: 1px solid rgba(240, 202, 127, 0.26);
   background: rgba(12, 9, 7, 0.6);
+  white-space: nowrap;
 }
 
 .screen {
@@ -179,7 +181,7 @@ h2 {
   border: 1px solid rgba(240, 202, 127, 0.4);
   border-radius: 999px;
   width: 220px;
-  min-height: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -188,6 +190,9 @@ h2 {
   background: rgba(18, 13, 9, 0.72);
   backdrop-filter: blur(4px);
   transition: transform 0.2s ease, border-color 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hero-meta a:hover,
