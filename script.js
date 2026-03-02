@@ -125,7 +125,8 @@ function initMap() {
     if (!from || !to) return;
 
     for (let i = 0; i < route.count; i += 1) {
-      const arc = buildRepeatedArc(from, to, i, route.count);
+      const repeated = buildRepeatedEndpoints(from, to, i, route.count);
+      const arc = buildGreatCircleArc(repeated.start, repeated.end, 80);
       const segments = splitArcOnDateline(arc);
 
       segments.forEach((segment) => {
@@ -222,49 +223,59 @@ function buildGreatCircleArc(startLatLng, endLatLng, points) {
   return result;
 }
 
-function buildRepeatedArc(startLatLng, endLatLng, index, total) {
-  const center = (total - 1) / 2;
-  const rank = index - center;
-  const offsetFactor = rank * 0.18;
-
-  const baseArc = buildGreatCircleArc(startLatLng, endLatLng, 80);
-  const [startLat, startLng] = startLatLng;
-  const [endLat, endLng] = endLatLng;
-  const dLat = endLat - startLat;
-  const dLng = endLng - startLng;
-  const normalLen = Math.hypot(dLat, dLng) || 1;
-  const nLat = -dLng / normalLen;
-  const nLng = dLat / normalLen;
-
-  return baseArc.map(([lat, lng], i) => {
-    const t = i / (baseArc.length - 1);
-    const bell = Math.sin(Math.PI * t);
-    const scale = bell * offsetFactor;
-    return [lat + nLat * scale, normalizeLng(lng + nLng * scale)];
-  });
-}
-
 function splitArcOnDateline(points) {
   if (points.length < 2) return [points];
 
   const segments = [];
-  let current = [points[0]];
+  let current = [[points[0][0], normalizeLng(points[0][1])]];
 
   for (let i = 1; i < points.length; i += 1) {
     const prev = current[current.length - 1];
-    const next = [points[i][0], normalizeLng(points[i][1])];
-    const diff = Math.abs(next[1] - prev[1]);
+    const nextRaw = points[i];
+    const next = [nextRaw[0], normalizeLng(nextRaw[1])];
 
-    if (diff > 170) {
-      if (current.length > 1) segments.push(current);
-      current = [next];
-    } else {
+    const lonDiff = next[1] - prev[1];
+    if (Math.abs(lonDiff) <= 180) {
       current.push(next);
+      continue;
     }
+
+    // Interpolate exact dateline crossing point to avoid long wrap lines.
+    const crossesEast = lonDiff > 180;
+    const boundaryFrom = crossesEast ? -180 : 180;
+    const boundaryTo = crossesEast ? 180 : -180;
+    const adjustedNextLon = crossesEast ? next[1] - 360 : next[1] + 360;
+    const t = (boundaryFrom - prev[1]) / (adjustedNextLon - prev[1]);
+    const latAtBoundary = prev[0] + (next[0] - prev[0]) * t;
+
+    current.push([latAtBoundary, boundaryFrom]);
+    if (current.length > 1) segments.push(current);
+    current = [[latAtBoundary, boundaryTo], next];
   }
 
   if (current.length > 1) segments.push(current);
   return segments;
+}
+
+function buildRepeatedEndpoints(startLatLng, endLatLng, index, total) {
+  const center = (total - 1) / 2;
+  const rank = index - center;
+  const offsetDeg = rank * 0.35;
+
+  const [startLat, startLng] = startLatLng;
+  const [endLat, endLng] = endLatLng;
+
+  const dLat = endLat - startLat;
+  const dLng = normalizeLng(endLng - startLng);
+  const len = Math.hypot(dLat, dLng) || 1;
+
+  const nLat = -dLng / len;
+  const nLng = dLat / len;
+
+  const start = [startLat + nLat * offsetDeg, normalizeLng(startLng + nLng * offsetDeg)];
+  const end = [endLat + nLat * offsetDeg, normalizeLng(endLng + nLng * offsetDeg)];
+
+  return { start, end };
 }
 
 function normalizeLng(lng) {
