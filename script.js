@@ -81,18 +81,40 @@ const CITY_COORDS = {
 
 const EXPERIENCE_DATA = [
   {
-    period: "Most Recent",
-    company: "To be filled from LinkedIn",
-    role: "Position Title",
-    summary: "你提供每段经历后，我会替换为真实公司、岗位、成果。",
-    logoText: "EX"
+    period: "2025.08 - 2026.01",
+    company: "Carnegie Mellon University",
+    role: "硬件与控制系统工程师",
+    summary: "参与软体机器人与控制系统项目，负责执行器控制与系统级性能验证。",
+    logoText: "CMU",
+    highlights: [
+      "负责 PWM 驱动与 PID 控制算法设计，实现 SMA 仿生记忆合金执行器的稳定控制。",
+      "在硬件约束下完成系统级联调，使用 MATLAB / Python 进行数据分析与参数优化。",
+      "完成 200+ 轮实验调参与性能验证，显著提升控制稳定性与可重复性。"
+    ]
   },
   {
-    period: "Earlier",
-    company: "To be filled from LinkedIn",
-    role: "Position Title",
-    summary: "按时间顺序展示，风格保持成熟稳重。",
-    logoText: "EX"
+    period: "2025.05 - 2025.08",
+    company: "西门子(中国)有限公司",
+    role: "5G 网络工程实习生",
+    summary: "面向工业场景 5G 网络落地，参与核心网测试、数据分析与信令定位。",
+    logoText: "SIEM",
+    highlights: [
+      "参与工业场景下 5G 核心网部署与系统级验证，设计终端接入与网络兼容性测试流程。",
+      "搭建并配置基于自研核心网的独立测试环境，完成多终端接入与端到端性能评估。",
+      "抓取并分析 GTP-U 用户面数据流，定位异常时延与丢包，持续优化网络稳定性。"
+    ]
+  },
+  {
+    period: "2021.09 - 2024.07",
+    company: "上海交通大学",
+    role: "无人机系统设计工程师",
+    summary: "聚焦无人机系统设计与验证，覆盖气动、结构、控制与硬件集成。",
+    logoText: "SJTU",
+    highlights: [
+      "主导无人机总体方案与硬件系统设计，完成气动外形优化与关键参数验证。",
+      "负责飞控电路与传感链路设计，完成从原理图到 PCB 的实现与调试闭环。",
+      "执行原理图审查、布局布线与台架测试，确保系统电气性能与可靠性。"
+    ]
   }
 ];
 
@@ -126,7 +148,7 @@ function initMap() {
 
     for (let i = 0; i < route.count; i += 1) {
       const repeated = buildRepeatedEndpoints(from, to, i, route.count);
-      const arc = buildGreatCircleArc(repeated.start, repeated.end, 80);
+      const arc = buildRouteArc(repeated.start, repeated.end, 80);
       const segments = splitArcOnDateline(arc);
 
       segments.forEach((segment) => {
@@ -182,6 +204,9 @@ function renderExperience() {
         <small>${escapeHtml(item.period)}</small>
       </div>
       <p>${escapeHtml(item.summary)}</p>
+      <ul class="exp-points">
+        ${(item.highlights || []).map((line) => `<li>${escapeHtml(line)}</li>`).join("")}
+      </ul>
     </article>
   `).join("");
 }
@@ -194,32 +219,24 @@ function toDeg(rad) {
   return (rad * 180) / Math.PI;
 }
 
-function buildGreatCircleArc(startLatLng, endLatLng, points) {
-  const [lat1, lon1] = startLatLng.map(toRad);
-  const [lat2, lon2] = endLatLng.map(toRad);
+function buildRouteArc(startLatLng, endLatLng, points) {
+  const [startLat, startLng] = startLatLng;
+  const [endLat, endLngRaw] = endLatLng;
+  const deltaLng = normalizeLng(endLngRaw - startLng);
+  const endLng = startLng + deltaLng;
 
-  const d = 2 * Math.asin(Math.sqrt(
-    Math.sin((lat2 - lat1) / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2
-  ));
-
-  if (d === 0) return [startLatLng, endLatLng];
+  const distance = haversineKm(startLat, startLng, endLat, normalizeLng(endLng));
+  const lift = Math.min(22, Math.max(2.2, distance / 1200));
 
   const result = [];
   for (let i = 0; i <= points; i += 1) {
-    const f = i / points;
-    const a = Math.sin((1 - f) * d) / Math.sin(d);
-    const b = Math.sin(f * d) / Math.sin(d);
-
-    const x = a * Math.cos(lat1) * Math.cos(lon1) + b * Math.cos(lat2) * Math.cos(lon2);
-    const y = a * Math.cos(lat1) * Math.sin(lon1) + b * Math.cos(lat2) * Math.sin(lon2);
-    const z = a * Math.sin(lat1) + b * Math.sin(lat2);
-
-    const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
-    const lon = Math.atan2(y, x);
-    result.push([toDeg(lat), toDeg(lon)]);
+    const t = i / points;
+    const latLinear = startLat + (endLat - startLat) * t;
+    const lngLinear = startLng + (endLng - startLng) * t;
+    const curve = Math.sin(Math.PI * t) * lift;
+    const lat = latLinear + curve;
+    result.push([lat, normalizeLng(lngLinear)]);
   }
-
   return result;
 }
 
@@ -235,7 +252,7 @@ function splitArcOnDateline(points) {
     const next = [nextRaw[0], normalizeLng(nextRaw[1])];
 
     const lonDiff = next[1] - prev[1];
-    if (Math.abs(lonDiff) <= 180) {
+    if (Math.abs(lonDiff) <= 170) {
       current.push(next);
       continue;
     }
@@ -260,7 +277,7 @@ function splitArcOnDateline(points) {
 function buildRepeatedEndpoints(startLatLng, endLatLng, index, total) {
   const center = (total - 1) / 2;
   const rank = index - center;
-  const offsetDeg = rank * 0.35;
+  const offsetDeg = rank * 0.22;
 
   const [startLat, startLng] = startLatLng;
   const [endLat, endLng] = endLatLng;
@@ -283,6 +300,16 @@ function normalizeLng(lng) {
   while (value > 180) value -= 360;
   while (value < -180) value += 360;
   return value;
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function escapeHtml(str) {
