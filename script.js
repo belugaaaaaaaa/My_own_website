@@ -132,7 +132,7 @@ function initMap() {
     maxBoundsViscosity: 1
   }).setView([30, 30], 2);
 
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
     attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
     maxZoom: 8,
     noWrap: true
@@ -154,9 +154,9 @@ function initMap() {
       segments.forEach((segment) => {
         if (segment.length < 2) return;
         L.polyline(segment, {
-          color: "#b14c1f",
-          weight: 1.8,
-          opacity: 0.7
+          color: "#ffffff",
+          weight: 1.7,
+          opacity: 0.82
         })
           .bindTooltip(`${route.from} → ${route.to} · 第${i + 1}次`)
           .addTo(routeLayer);
@@ -170,10 +170,10 @@ function initMap() {
 
     L.circleMarker(coord, {
       radius: 3 + Math.min(visits, 8),
-      color: "#0f6f7f",
-      weight: 2,
-      fillColor: "#ffffff",
-      fillOpacity: 0.95
+      color: "#f4d58d",
+      weight: 1.6,
+      fillColor: "#111111",
+      fillOpacity: 0.98
     })
       .bindPopup(`<b>${escapeHtml(city)}</b><br>关联航线: ${visits}`)
       .addTo(airportLayer);
