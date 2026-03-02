@@ -100,16 +100,20 @@ const yearEl = document.getElementById("year");
 if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
 initMap();
-renderRouteBoard();
 renderExperience();
-updateStats();
 
 function initMap() {
-  const map = L.map("map", { worldCopyJump: true, minZoom: 2 }).setView([30, 30], 2);
+  const map = L.map("map", {
+    worldCopyJump: false,
+    minZoom: 2,
+    maxBounds: [[-85, -180], [85, 180]],
+    maxBoundsViscosity: 1
+  }).setView([30, 30], 2);
 
   L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-    maxZoom: 8
+    maxZoom: 8,
+    noWrap: true
   }).addTo(map);
 
   const routeLayer = L.layerGroup().addTo(map);
@@ -122,13 +126,18 @@ function initMap() {
 
     for (let i = 0; i < route.count; i += 1) {
       const arc = buildRepeatedArc(from, to, i, route.count);
-      L.polyline(arc, {
-        color: "#b14c1f",
-        weight: 1.8,
-        opacity: 0.7
-      })
-        .bindTooltip(`${route.from} → ${route.to} · 第${i + 1}次`)
-        .addTo(routeLayer);
+      const segments = splitArcOnDateline(arc);
+
+      segments.forEach((segment) => {
+        if (segment.length < 2) return;
+        L.polyline(segment, {
+          color: "#b14c1f",
+          weight: 1.8,
+          opacity: 0.7
+        })
+          .bindTooltip(`${route.from} → ${route.to} · 第${i + 1}次`)
+          .addTo(routeLayer);
+      });
     }
   });
 
@@ -146,28 +155,6 @@ function initMap() {
       .bindPopup(`<b>${escapeHtml(city)}</b><br>关联航线: ${visits}`)
       .addTo(airportLayer);
   });
-}
-
-function renderRouteBoard() {
-  const board = document.getElementById("route-board");
-  if (!board) return;
-
-  const max = Math.max(...ROUTE_RANKING.map((r) => r.count));
-
-  board.innerHTML = ROUTE_RANKING
-    .map((route, idx) => {
-      const pct = (route.count / max) * 100;
-      return `
-        <article class="route-item">
-          <div class="route-item-head">
-            <span>${idx + 1}. ${escapeHtml(route.from)} - ${escapeHtml(route.to)}</span>
-            <span>${route.count}次</span>
-          </div>
-          <div class="route-bar"><div class="route-bar-fill" style="width:${pct}%;"></div></div>
-        </article>
-      `;
-    })
-    .join("");
 }
 
 function cityVisitCount(city) {
@@ -196,28 +183,6 @@ function renderExperience() {
       <p>${escapeHtml(item.summary)}</p>
     </article>
   `).join("");
-}
-
-function updateStats() {
-  const uniqueCities = new Set(ROUTE_RANKING.flatMap((r) => [r.from, r.to]));
-  const totalFlights = ROUTE_RANKING.reduce((sum, r) => sum + r.count, 0);
-
-  const totalDistance = ROUTE_RANKING.reduce((sum, r) => {
-    const from = CITY_COORDS[r.from];
-    const to = CITY_COORDS[r.to];
-    if (!from || !to) return sum;
-    return sum + haversineKm(from[0], from[1], to[0], to[1]) * r.count;
-  }, 0);
-
-  setText("stat-airports", String(uniqueCities.size));
-  setText("stat-routes", String(ROUTE_RANKING.length));
-  setText("stat-flights", String(totalFlights));
-  setText("stat-distance", `${Math.round(totalDistance).toLocaleString()} km`);
-}
-
-function setText(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = value;
 }
 
 function toRad(deg) {
@@ -260,7 +225,7 @@ function buildGreatCircleArc(startLatLng, endLatLng, points) {
 function buildRepeatedArc(startLatLng, endLatLng, index, total) {
   const center = (total - 1) / 2;
   const rank = index - center;
-  const offsetFactor = rank * 0.45;
+  const offsetFactor = rank * 0.18;
 
   const baseArc = buildGreatCircleArc(startLatLng, endLatLng, 80);
   const [startLat, startLng] = startLatLng;
@@ -275,18 +240,38 @@ function buildRepeatedArc(startLatLng, endLatLng, index, total) {
     const t = i / (baseArc.length - 1);
     const bell = Math.sin(Math.PI * t);
     const scale = bell * offsetFactor;
-    return [lat + nLat * scale, lng + nLng * scale];
+    return [lat + nLat * scale, normalizeLng(lng + nLng * scale)];
   });
 }
 
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+function splitArcOnDateline(points) {
+  if (points.length < 2) return [points];
+
+  const segments = [];
+  let current = [points[0]];
+
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = current[current.length - 1];
+    const next = [points[i][0], normalizeLng(points[i][1])];
+    const diff = Math.abs(next[1] - prev[1]);
+
+    if (diff > 170) {
+      if (current.length > 1) segments.push(current);
+      current = [next];
+    } else {
+      current.push(next);
+    }
+  }
+
+  if (current.length > 1) segments.push(current);
+  return segments;
+}
+
+function normalizeLng(lng) {
+  let value = lng;
+  while (value > 180) value -= 360;
+  while (value < -180) value += 360;
+  return value;
 }
 
 function escapeHtml(str) {
