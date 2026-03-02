@@ -1,0 +1,187 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>我的飞行航线与飞机图库</title>
+  <meta name="description" content="在世界地图上展示飞过的航线，并记录各机场拍摄的飞机图片。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+
+  <header class="site-header">
+    <a class="brand" href="#top">Aviation Logbook</a>
+    <nav class="site-nav">
+      <a href="#map-section">航线地图</a>
+      <a href="#gallery-section">机场图库</a>
+      <a href="#manage-section">数据管理</a>
+    </nav>
+  </header>
+
+  <main id="top" class="container">
+    <section class="hero reveal">
+      <p class="eyebrow">PERSONAL AVIATION WEBSITE</p>
+      <h1>我的世界航线与飞机图库</h1>
+      <p>
+        用地图记录我飞过的每一段航程，在每个机场留下拍摄到的飞机瞬间。
+      </p>
+      <div class="hero-stats">
+        <article>
+          <span id="stat-airports">0</span>
+          <small>已记录机场</small>
+        </article>
+        <article>
+          <span id="stat-routes">0</span>
+          <small>飞行航线</small>
+        </article>
+        <article>
+          <span id="stat-photos">0</span>
+          <small>飞机照片</small>
+        </article>
+        <article>
+          <span id="stat-distance">0 km</span>
+          <small>累计里程</small>
+        </article>
+      </div>
+    </section>
+
+    <section id="map-section" class="section reveal">
+      <div class="section-head">
+        <h2>世界航线地图</h2>
+        <p>点击机场标记可查看机场名称与照片数量。</p>
+      </div>
+      <div id="map" role="img" aria-label="世界地图航线"></div>
+    </section>
+
+    <section id="gallery-section" class="section reveal">
+      <div class="section-head">
+        <h2>机场飞机图库</h2>
+        <p>按机场归档拍摄作品，支持自定义新增。</p>
+      </div>
+      <div id="gallery" class="gallery-grid"></div>
+    </section>
+
+    <section id="manage-section" class="section reveal">
+      <div class="section-head">
+        <h2>数据管理</h2>
+        <p>新增航线、新增机场照片、导入导出你的记录。</p>
+      </div>
+
+      <div class="manage-grid">
+        <form id="route-form" class="panel">
+          <h3>新增航线</h3>
+          <p class="hint">起点与终点如果不存在，会自动创建机场。</p>
+
+          <label>起飞机场代码 (IATA)
+            <input name="fromCode" maxlength="4" placeholder="PVG" required />
+          </label>
+          <label>起点机场名称
+            <input name="fromName" placeholder="Shanghai Pudong" />
+          </label>
+          <div class="input-row">
+            <label>起点纬度
+              <input name="fromLat" type="number" step="0.0001" placeholder="31.1443" required />
+            </label>
+            <label>起点经度
+              <input name="fromLng" type="number" step="0.0001" placeholder="121.8083" required />
+            </label>
+          </div>
+
+          <label>到达机场代码 (IATA)
+            <input name="toCode" maxlength="4" placeholder="LAX" required />
+          </label>
+          <label>到达机场名称
+            <input name="toName" placeholder="Los Angeles Intl" />
+          </label>
+          <div class="input-row">
+            <label>到达纬度
+              <input name="toLat" type="number" step="0.0001" placeholder="33.9425" required />
+            </label>
+            <label>到达经度
+              <input name="toLng" type="number" step="0.0001" placeholder="-118.4081" required />
+            </label>
+          </div>
+
+          <div class="input-row">
+            <label>航司
+              <input name="airline" placeholder="China Eastern" />
+            </label>
+            <label>机型
+              <input name="aircraft" placeholder="A350-900" />
+            </label>
+          </div>
+          <label>飞行日期
+            <input name="date" type="date" />
+          </label>
+          <label>备注
+            <textarea name="note" rows="2" placeholder="例如：首飞北美航线"></textarea>
+          </label>
+          <button type="submit">添加航线</button>
+        </form>
+
+        <form id="photo-form" class="panel">
+          <h3>新增机场照片</h3>
+          <p class="hint">支持图片 URL，或本地文件转为浏览器内保存。</p>
+
+          <label>机场代码
+            <input name="airportCode" maxlength="4" placeholder="LAX" required />
+          </label>
+          <label>照片标题
+            <input name="title" placeholder="A380 at golden hour" required />
+          </label>
+          <div class="input-row">
+            <label>飞机型号
+              <input name="aircraftType" placeholder="A380" />
+            </label>
+            <label>拍摄日期
+              <input name="takenOn" type="date" />
+            </label>
+          </div>
+          <label>图片 URL
+            <input name="imageUrl" type="url" placeholder="https://..." />
+          </label>
+          <label>或上传本地图片
+            <input name="imageFile" type="file" accept="image/*" />
+          </label>
+          <label>备注
+            <textarea name="note" rows="2" placeholder="例如：跑道 24R 旁拍摄"></textarea>
+          </label>
+          <button type="submit">添加照片</button>
+        </form>
+      </div>
+
+      <div class="panel data-tools">
+        <h3>导入与备份</h3>
+        <div class="tool-row">
+          <button id="export-btn" type="button">导出数据 JSON</button>
+          <label class="file-btn">导入数据 JSON
+            <input id="import-input" type="file" accept="application/json" />
+          </label>
+          <button id="reset-btn" type="button" class="danger">恢复示例数据</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <small>© <span id="year"></span> 你的名字 · Hosted on GitHub Pages</small>
+  </footer>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="./script.js"></script>
+</body>
+</html>
