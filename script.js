@@ -96,30 +96,11 @@ const EXPERIENCE_DATA = [
   }
 ];
 
-const PHOTO_DATA = [
-  {
-    city: "香港",
-    title: "A350 Pushback",
-    imageUrl: "https://images.unsplash.com/photo-1529074963764-98f45c47344b?auto=format&fit=crop&w=1200&q=80"
-  },
-  {
-    city: "洛杉矶",
-    title: "Dreamliner at Sunset",
-    imageUrl: "https://images.unsplash.com/photo-1464039397811-476f652a343b?auto=format&fit=crop&w=1200&q=80"
-  },
-  {
-    city: "东京",
-    title: "Heavy Departure",
-    imageUrl: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1200&q=80"
-  }
-];
-
 const yearEl = document.getElementById("year");
 if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
 initMap();
 renderRouteBoard();
-renderGallery();
 renderExperience();
 updateStats();
 
@@ -139,14 +120,16 @@ function initMap() {
     const to = CITY_COORDS[route.to];
     if (!from || !to) return;
 
-    const arc = buildGreatCircleArc(from, to, 80);
-    L.polyline(arc, {
-      color: "#b14c1f",
-      weight: 1.2 + route.count * 0.7,
-      opacity: 0.32 + route.count * 0.08
-    })
-      .bindTooltip(`${route.from} → ${route.to} · ${route.count}次`)
-      .addTo(routeLayer);
+    for (let i = 0; i < route.count; i += 1) {
+      const arc = buildRepeatedArc(from, to, i, route.count);
+      L.polyline(arc, {
+        color: "#b14c1f",
+        weight: 1.8,
+        opacity: 0.7
+      })
+        .bindTooltip(`${route.from} → ${route.to} · 第${i + 1}次`)
+        .addTo(routeLayer);
+    }
   });
 
   Object.entries(CITY_COORDS).forEach(([city, coord]) => {
@@ -194,21 +177,6 @@ function cityVisitCount(city) {
   }, 0);
 }
 
-function renderGallery() {
-  const gallery = document.getElementById("gallery");
-  if (!gallery) return;
-
-  gallery.innerHTML = PHOTO_DATA.map((photo) => `
-    <article class="photo-card">
-      <img src="${escapeAttr(photo.imageUrl)}" alt="${escapeAttr(photo.title)}" loading="lazy" />
-      <div class="photo-body">
-        <h4>${escapeHtml(photo.title)}</h4>
-        <small>${escapeHtml(photo.city)}</small>
-      </div>
-    </article>
-  `).join("");
-}
-
 function renderExperience() {
   const container = document.getElementById("experience-list");
   if (!container) return;
@@ -232,7 +200,7 @@ function renderExperience() {
 
 function updateStats() {
   const uniqueCities = new Set(ROUTE_RANKING.flatMap((r) => [r.from, r.to]));
-  const totalRoutes = ROUTE_RANKING.reduce((sum, r) => sum + r.count, 0);
+  const totalFlights = ROUTE_RANKING.reduce((sum, r) => sum + r.count, 0);
 
   const totalDistance = ROUTE_RANKING.reduce((sum, r) => {
     const from = CITY_COORDS[r.from];
@@ -242,8 +210,8 @@ function updateStats() {
   }, 0);
 
   setText("stat-airports", String(uniqueCities.size));
-  setText("stat-routes", String(totalRoutes));
-  setText("stat-photos", String(PHOTO_DATA.length));
+  setText("stat-routes", String(ROUTE_RANKING.length));
+  setText("stat-flights", String(totalFlights));
   setText("stat-distance", `${Math.round(totalDistance).toLocaleString()} km`);
 }
 
@@ -287,6 +255,28 @@ function buildGreatCircleArc(startLatLng, endLatLng, points) {
   }
 
   return result;
+}
+
+function buildRepeatedArc(startLatLng, endLatLng, index, total) {
+  const center = (total - 1) / 2;
+  const rank = index - center;
+  const offsetFactor = rank * 0.45;
+
+  const baseArc = buildGreatCircleArc(startLatLng, endLatLng, 80);
+  const [startLat, startLng] = startLatLng;
+  const [endLat, endLng] = endLatLng;
+  const dLat = endLat - startLat;
+  const dLng = endLng - startLng;
+  const normalLen = Math.hypot(dLat, dLng) || 1;
+  const nLat = -dLng / normalLen;
+  const nLng = dLat / normalLen;
+
+  return baseArc.map(([lat, lng], i) => {
+    const t = i / (baseArc.length - 1);
+    const bell = Math.sin(Math.PI * t);
+    const scale = bell * offsetFactor;
+    return [lat + nLat * scale, lng + nLng * scale];
+  });
 }
 
 function haversineKm(lat1, lon1, lat2, lon2) {
