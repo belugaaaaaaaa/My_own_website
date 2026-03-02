@@ -117,6 +117,23 @@ h1 {
   margin: 10px 0 0;
 }
 
+.profile-tags {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.profile-tags span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 7px 12px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 .hero-stats {
   margin-top: 20px;
   display: grid;
@@ -158,6 +175,26 @@ h1 {
 .section-head p {
   margin: 0;
   color: var(--muted);
+}
+
+.about-placeholder {
+  margin: 0;
+  color: var(--muted);
+}
+
+.contact-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.contact-grid a {
+  text-decoration: none;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 11px 12px;
+  font-weight: 600;
 }
 
 #map {
