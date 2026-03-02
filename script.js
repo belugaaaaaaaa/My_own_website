@@ -147,8 +147,7 @@ function initMap() {
     if (!from || !to) return;
 
     for (let i = 0; i < route.count; i += 1) {
-      const repeated = buildRepeatedEndpoints(from, to, i, route.count);
-      const arc = buildRouteArc(repeated.start, repeated.end, 80);
+      const arc = buildRouteArcVariant(from, to, i, route.count, 80);
       const segments = splitArcOnDateline(arc);
 
       segments.forEach((segment) => {
@@ -240,6 +239,35 @@ function buildRouteArc(startLatLng, endLatLng, points) {
   return result;
 }
 
+function buildRouteArcVariant(startLatLng, endLatLng, index, total, points) {
+  const center = (total - 1) / 2;
+  const rank = index - center;
+  const [startLat, startLng] = startLatLng;
+  const [endLat, endLngRaw] = endLatLng;
+
+  const deltaLng = normalizeLng(endLngRaw - startLng);
+  const endLng = startLng + deltaLng;
+
+  const distance = haversineKm(startLat, startLng, endLat, normalizeLng(endLng));
+  const baseLift = Math.min(22, Math.max(2.2, distance / 1200));
+  const variantLift = baseLift + rank * 1.05;
+
+  const result = [];
+  for (let i = 0; i <= points; i += 1) {
+    const t = i / points;
+    const latLinear = startLat + (endLat - startLat) * t;
+    const lngLinear = startLng + (endLng - startLng) * t;
+    const curve = Math.sin(Math.PI * t) * variantLift;
+    const lat = latLinear + curve;
+    result.push([lat, normalizeLng(lngLinear)]);
+  }
+
+  // Keep exact same endpoints across repeated flights.
+  result[0] = [startLat, normalizeLng(startLng)];
+  result[result.length - 1] = [endLat, normalizeLng(endLngRaw)];
+  return result;
+}
+
 function splitArcOnDateline(points) {
   if (points.length < 2) return [points];
 
@@ -272,27 +300,6 @@ function splitArcOnDateline(points) {
 
   if (current.length > 1) segments.push(current);
   return segments;
-}
-
-function buildRepeatedEndpoints(startLatLng, endLatLng, index, total) {
-  const center = (total - 1) / 2;
-  const rank = index - center;
-  const offsetDeg = rank * 0.22;
-
-  const [startLat, startLng] = startLatLng;
-  const [endLat, endLng] = endLatLng;
-
-  const dLat = endLat - startLat;
-  const dLng = normalizeLng(endLng - startLng);
-  const len = Math.hypot(dLat, dLng) || 1;
-
-  const nLat = -dLng / len;
-  const nLng = dLat / len;
-
-  const start = [startLat + nLat * offsetDeg, normalizeLng(startLng + nLng * offsetDeg)];
-  const end = [endLat + nLat * offsetDeg, normalizeLng(endLng + nLng * offsetDeg)];
-
-  return { start, end };
 }
 
 function normalizeLng(lng) {
